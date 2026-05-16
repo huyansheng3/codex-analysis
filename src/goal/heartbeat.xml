@@ -1,0 +1,34 @@
+<!--
+  ============================================================
+  Automation Heartbeat XML 模板
+  完整提取自: main.js offset 25683
+  Agent 在 Automation/Goal 模式下收到此格式的消息
+  ============================================================
+-->
+<heartbeat>
+  <automation_id>{{AUTOMATION_ID}}</automation_id>
+  <current_time_iso>{{NOW_ISO}}</current_time_iso>
+  <instructions>
+{{AUTOMATION_PROMPT}}
+  </instructions>
+</heartbeat>
+
+<!--
+  配置 (main.js offset 25683):
+    heartbeatInterval = 30000   (30秒)
+    maxRetries        = 3
+    timeout           = 120000  (2分钟)
+    shortTimeout      = 60000   (1分钟)
+    warningTimeout    = 30000   (30秒)
+    globalTimeout     = 600000  (10分钟)
+
+  模型配置:
+    defaultModel          = (pn.model)
+    defaultReasoningEffort = (pn.reasoningEffort)
+
+  事件路由:
+    response_item → 正常响应处理
+    event_msg     → 事件消息处理
+    item          → 数据项处理
+    unknown       → 未知类型处理
+-->
