@@ -8,7 +8,7 @@
 codex-ana/
 ├── README.md                              ← 项目概览和文档索引
 ├── codex-app-architecture-report.md       ← 整体架构分析
-├── docs/                                  ← 深度分析文档 (7 篇)
+├── docs/                                  ← 深度分析文档 (16 篇)
 │   ├── codex-ipc-communication-layer.md
 │   ├── codex-main-process-architecture.md
 │   ├── codex-native-modules-deep-dive.md
@@ -17,70 +17,52 @@ codex-ana/
 │   ├── codex-security-attack-surface.md
 │   ├── codex-computer-use-implementation.md
 │   ├── codex-goal-mode-implementation.md
-│   └── codex-goal-agent-layer.md
-├── src/                                   ← 反编译重建的源代码 (13 文件)
+│   ├── codex-goal-agent-layer.md
+│   ├── codex-remote-control-system.md
+│   ├── codex-hotkey-window-system.md
+│   ├── codex-dictation-system.md
+│   ├── codex-browser-sidebar-system.md
+│   ├── codex-plan-multi-agent-system.md
+│   ├── codex-agent-core-process-architecture.md
+│   └── codex-desktop-pet-implementation.md
+├── src/                                   ← 反编译重建的源代码
 │   ├── preload/         electron-bridge.ts, sandbox-preload.ts
 │   ├── ipc/             channels.ts, message-types.ts
 │   ├── main/            bootstrap.ts, computer-use-path.ts
 │   ├── native/          objc-js-api.ts
 │   ├── plugins/         manifest.ts
 │   ├── computer-use/    mcp-tools.ts, permission-system.ts
-│   └── goal/            automation-template.md, heartbeat.xml, thread-follower.ts
+│   ├── goal/            automation-template.md, heartbeat.xml, thread-follower.ts
+│   ├── remote-control/  enrollment.ts, ssh-connections.ts
+│   └── pet/             spritesheet-engine.ts, avatar-overlay.ts,
+│                        state-machine.ts, hotkey-window.ts
 └── CLAUDE.md                              ← 本文件
 ```
 
 ## 分析方法论
 
-### ASAR 解压
+详细方法论见以下文档：
 
-Electron 应用的代码打包在 `app.asar` 中。解压方法：
+| 文档 | 内容 |
+|------|------|
+| [docs/reverse-engineering-methodology.md](docs/reverse-engineering-methodology.md) | 通用逆向方法论：五阶段流程、不同目标技术矩阵、工具集 |
+| [docs/no-sourcemap-js-reconstruction.md](docs/no-sourcemap-js-reconstruction.md) | **无 sourcemap 的 JS 六步重建法**：字符串锚点、上下文提取、变量反推、控制流保留、跨文件关联、类型推断 |
 
+### 快速参考
+
+**ASAR 解压**：格式为 `[4B header_size][4B reserved][JSON header][file blobs]`。
 ```bash
-# 找到 asar 文件
 find /Applications/Codex.app -name "*.asar" -not -path "*/node_modules/*"
-
-# 如果没有 asar CLI，用 Python 手动解析
-# ASAR 格式: 16字节前缀 + JSON header + 文件数据
-# JSON header 的 offset 通过 brace-matching 定位
+python3 scripts/extract-asar.py app.asar ./unpacked
 ```
 
-### Minified JS 反编译流程
+**混淆 JS 分析**：核心是**字符串锚点法**——字符串在混淆后不变，每个有意义的字符串都是进入代码的入口。
 
-核心方法不是自动反编译，而是**字符串锚点 + 上下文分析 + 语义重建**：
+**.node 模块**：`nm -gU` 导出符号、`strings` 嵌入字符串、`otool -L` 动态库依赖。
 
-1. **字符串锚点定位**：搜索特征字符串（如 `"SKY_CUA_SERVICE_PATH"`）在 minified code 中的 offset
-2. **上下文提取**：Python 脚本提取 offset 前后 200-500 字符
-3. **变量名反推**：从赋值模式推断语义（如 `e[ft]?.trim()` → `env["SKY_CUA_SERVICE_PATH"]?.trim()`）
-4. **控制流保留**：if/return/for/?./??/|| 的语义在 minified 后不变
-5. **跨文件关联**：同一个字符串在两处出现 → IPC 通道的发送端和接收端
-6. **类型推断**：从默认值（`process.env`）、运算符（`?.`）、调用方式反推 TypeScript 类型
+**Swift 二进制**：通过 `strings` 提取 Swift mangling（`_TtC...`）→ demangle 恢复类名/方法名。
 
-### 原生 .node 模块分析
-
-```bash
-# 导出符号 → 重建 C++ 类结构
-nm -gU /path/to/module.node
-
-# 嵌入字符串 → 功能推断
-strings /path/to/binary | grep -i keyword
-
-# 动态库依赖
-otool -L /path/to/binary
-```
-
-### Swift 二进制分析
-
-对于 Computer Use 的 Swift 二进制（无符号表），使用 `strings` 提取：
-- 类名和方法名（Swift mangling: `_TtC18Codex_Computer_Use33CodexAppServerThreadEventObserver`）
-- 硬编码字符串（Bundle IDs、URLs、错误消息）
-- 从字符串中重建 ObjC/Swift 接口定义
-
-### i18n 数据利用
-
-React 渲染进程的 i18n 数据（35MB comment-preload.js）包含完整的 UI 界面标签。通过提取 i18n key 可以重建：
-- UI 组件结构
-- 功能状态枚举（如 Goal 的 active/paused/budgetLimited/complete）
-- 用户交互流程
+**i18n 数据**：35MB `comment-preload.js` 包含完整 UI 标签，提取 i18n key 可重建组件结构和功能枚举。
 
 ## 关键发现
 

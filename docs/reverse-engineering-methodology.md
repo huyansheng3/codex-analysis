@@ -1,6 +1,8 @@
 # 软件逆向工程方法论：从零到完整架构重建
 
 > 一份面向实战的逆向分析方法指南，涵盖 Electron 应用、原生模块、WASM 运行时和混淆代码。
+>
+> 关于无 sourcemap 场景下的 JS 六步重建法的详细实操，参见 [no-sourcemap-js-reconstruction.md](no-sourcemap-js-reconstruction.md)。
 
 ---
 
